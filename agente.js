@@ -94,7 +94,7 @@ async function executeAction(page, action) {
       await page.keyboard.type(action.text);
     }
   }
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(2000);
 }
 
 (async () => {
