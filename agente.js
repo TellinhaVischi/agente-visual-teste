@@ -4,7 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 
 const client = new Anthropic();
-const MAX_STEPS = 10;
+const MAX_STEPS = 15;
 
 function buildPrompt(history) {
   const goal =
