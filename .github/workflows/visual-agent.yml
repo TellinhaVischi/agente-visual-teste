@@ -37,7 +37,7 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Run visual agent
-        run: xvfb-run -a node agente.js
+        run: node agente.js
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 

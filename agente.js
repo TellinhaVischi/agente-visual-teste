@@ -107,8 +107,9 @@ function fail(reason) {
   let browser;
 
   try {
+    const isCI = process.env.CI === 'true';
     browser = await chromium.launch({
-      headless: false,
+      headless: isCI,
       args: ['--disable-blink-features=AutomationControlled'],
     });
     context = await browser.newContext({
