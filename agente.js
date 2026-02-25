@@ -114,7 +114,7 @@ async function executeAction(page, action) {
 
   console.log('Abrindo google.com...');
   await page.goto('https://www.google.com');
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(1500);
 
   const history = [];
 
