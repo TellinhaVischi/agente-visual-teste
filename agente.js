@@ -4,7 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 
 const client = new Anthropic();
-const MAX_STEPS = 10;
+const MAX_STEPS = 15;
 
 function buildPrompt(history) {
   const goal =
@@ -26,8 +26,9 @@ function buildPrompt(history) {
     'Se a barra de pesquisa já estiver focada (com cursor ou dropdown aberto), use "type" para digitar. ' +
     'Se o texto já foi digitado, use "type" com "Enter" para confirmar. ' +
     'Se os resultados da pesquisa já aparecerem na tela, retorne "done". ' +
+    'Se detectar um erro irrecuperável na tela (CAPTCHA, página de erro, bloqueio), retorne "fail". ' +
     'Responda APENAS com JSON válido, sem markdown: ' +
-    '{"action": "click|type|done", "x": number, "y": number, "text": string, "reason": string}'
+    '{"action": "click|type|done|fail", "x": number, "y": number, "text": string, "reason": string}'
   );
 }
 
@@ -59,7 +60,6 @@ async function askClaude(imagePath, history) {
 }
 
 function parseAction(raw) {
-  // Extrai todos os blocos {...} e retorna o último JSON válido
   let lastValid = null;
   let depth = 0;
   let start = -1;
@@ -97,68 +97,93 @@ async function executeAction(page, action) {
   await page.waitForTimeout(1500);
 }
 
+function fail(reason) {
+  console.error(`\nFALHA: ${reason}`);
+  process.exit(1);
+}
+
 (async () => {
-  const browser = await chromium.launch({
-    headless: false,
-    args: ['--disable-blink-features=AutomationControlled'],
-  });
-  const context = await browser.newContext({
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    viewport: { width: 1280, height: 720 },
-  });
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-  });
-  const page = await context.newPage();
+  let context;
+  let browser;
 
-  console.log('Abrindo google.com...');
-  await page.goto('https://www.google.com');
-  await page.waitForTimeout(1000);
+  try {
+    browser = await chromium.launch({
+      headless: false,
+      args: ['--disable-blink-features=AutomationControlled'],
+    });
+    context = await browser.newContext({
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 720 },
+    });
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
+    const page = await context.newPage();
 
-  const history = [];
+    console.log('Abrindo google.com...');
+    await page.goto('https://www.google.com');
+    await page.waitForTimeout(1500);
 
-  for (let step = 1; step <= MAX_STEPS; step++) {
-    console.log(`\n=== Step ${step}/${MAX_STEPS} ===`);
+    const history = [];
+    let concluded = false;
 
-    const screenshotPath = await takeScreenshot(page, step);
-    console.log(`Screenshot: ${screenshotPath}`);
+    for (let step = 1; step <= MAX_STEPS; step++) {
+      console.log(`\n=== Step ${step}/${MAX_STEPS} ===`);
 
-    console.log('Perguntando ao Claude...');
-    const raw = await askClaude(screenshotPath, history);
-    console.log(`Resposta: ${raw}`);
+      const screenshotPath = await takeScreenshot(page, step);
+      console.log(`Screenshot: ${screenshotPath}`);
 
-    let action;
-    try {
-      action = parseAction(raw);
-    } catch (e) {
-      console.error(`Erro ao parsear JSON: ${e.message}`);
-      break;
+      console.log('Perguntando ao Claude...');
+      const raw = await askClaude(screenshotPath, history);
+      console.log(`Resposta: ${raw}`);
+
+      let action;
+      try {
+        action = parseAction(raw);
+      } catch (e) {
+        await context.close();
+        await browser.close();
+        fail(`Erro ao parsear JSON da resposta do Claude: ${e.message}`);
+      }
+
+      console.log(`Ação: ${action.action} | Motivo: ${action.reason}`);
+
+      if (action.action === 'done') {
+        console.log('\nConcluído! Pesquisa realizada com sucesso.');
+        await takeScreenshot(page, `${step}_final`);
+        concluded = true;
+        break;
+      }
+
+      if (action.action === 'fail') {
+        await takeScreenshot(page, `${step}_fail`);
+        await context.close();
+        await browser.close();
+        fail(`Claude declarou falha: ${action.reason}`);
+      }
+
+      if (action.action === 'click') {
+        console.log(`Clicando em (${action.x}, ${action.y})`);
+      } else if (action.action === 'type') {
+        console.log(`Digitando: "${action.text}"`);
+      }
+
+      history.push({ action: action.action, x: action.x, y: action.y, text: action.text, reason: action.reason });
+
+      await executeAction(page, action);
     }
 
-    console.log(`Ação: ${action.action} | Motivo: ${action.reason}`);
+    await context.close();
+    await browser.close();
 
-    if (action.action === 'done') {
-      console.log('\nConcluído! Pesquisa realizada com sucesso.');
-      await takeScreenshot(page, `${step}_final`);
-      break;
+    if (!concluded) {
+      fail(`Limite de ${MAX_STEPS} steps atingido sem concluir a tarefa.`);
     }
 
-    if (action.action === 'click') {
-      console.log(`Clicando em (${action.x}, ${action.y})`);
-    } else if (action.action === 'type') {
-      console.log(`Digitando: "${action.text}"`);
-    }
-
-    history.push({ action: action.action, x: action.x, y: action.y, text: action.text, reason: action.reason });
-
-    await executeAction(page, action);
-
-    if (step === MAX_STEPS) {
-      console.log('\nLimite de steps atingido.');
-    }
+  } catch (e) {
+    if (context) await context.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
+    fail(`Erro inesperado: ${e.message}`);
   }
-
-  await context.close();
-  await browser.close();
 })();
