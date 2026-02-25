@@ -2,15 +2,12 @@ require('dotenv').config();
 const { chromium } = require('playwright');
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
+const path = require('path');
 
 const client = new Anthropic();
 const MAX_STEPS = 15;
 
-function buildPrompt(history) {
-  const goal =
-    "Você é um agente de testes automatizados. Sua tarefa é pesquisar " +
-    "'Playwright testes automatizados' no Google e confirmar que os resultados apareceram.";
-
+function buildPrompt(instrucao, history) {
   const historyText =
     history.length === 0
       ? 'Nenhuma ação realizada ainda.'
@@ -19,7 +16,7 @@ function buildPrompt(history) {
           .join('\n');
 
   return (
-    goal +
+    instrucao +
     '\n\nAções já realizadas:\n' +
     historyText +
     '\n\nOlhe o screenshot atual e diga qual é a PRÓXIMA ação a executar. ' +
@@ -32,31 +29,47 @@ function buildPrompt(history) {
   );
 }
 
-async function takeScreenshot(page, step) {
-  const path = `screenshot_step${step}.png`;
-  await page.screenshot({ path });
-  return path;
+async function takeScreenshot(page, scenarioName, step) {
+  const safe = scenarioName.replace(/[^a-z0-9_-]/gi, '_');
+  const filePath = `screenshot_${safe}_step${step}.png`;
+  await page.screenshot({ path: filePath });
+  return filePath;
 }
 
-async function askClaude(imagePath, history) {
+async function askClaude(imagePath, instrucao, history) {
   const imageData = fs.readFileSync(imagePath).toString('base64');
-  const response = await client.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 256,
-    messages: [
-      {
-        role: 'user',
-        content: [
+  const MAX_RETRIES = 4;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.messages.create({
+        model: 'claude-opus-4-6',
+        max_tokens: 256,
+        messages: [
           {
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/png', data: imageData },
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/png', data: imageData },
+              },
+              { type: 'text', text: buildPrompt(instrucao, history) },
+            ],
           },
-          { type: 'text', text: buildPrompt(history) },
         ],
-      },
-    ],
-  });
-  return response.content[0].text;
+      });
+      return response.content[0].text;
+    } catch (e) {
+      const isOverloaded = e.status === 529 || (e.message && e.message.includes('overloaded'));
+      if (isOverloaded && attempt < MAX_RETRIES) {
+        const waitMs = attempt * 5000;
+        console.log(`API sobrecarregada. Tentativa ${attempt}/${MAX_RETRIES - 1}, aguardando ${waitMs / 1000}s...`);
+        await new Promise(r => setTimeout(r, waitMs));
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
 function parseAction(raw) {
@@ -97,21 +110,15 @@ async function executeAction(page, action) {
   await page.waitForTimeout(1500);
 }
 
-function fail(reason) {
-  console.error(`\nFALHA: ${reason}`);
-  process.exit(1);
-}
+async function runScenario(browser, scenario) {
+  const { nome, instrucao } = scenario;
 
-(async () => {
+  console.log(`\n${'='.repeat(50)}`);
+  console.log(`CENÁRIO: ${nome}`);
+  console.log('='.repeat(50));
+
   let context;
-  let browser;
-
   try {
-    const isCI = process.env.CI === 'true';
-    browser = await chromium.launch({
-      headless: isCI,
-      args: ['--disable-blink-features=AutomationControlled'],
-    });
     context = await browser.newContext({
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -130,13 +137,13 @@ function fail(reason) {
     let concluded = false;
 
     for (let step = 1; step <= MAX_STEPS; step++) {
-      console.log(`\n=== Step ${step}/${MAX_STEPS} ===`);
+      console.log(`\n--- Step ${step}/${MAX_STEPS} ---`);
 
-      const screenshotPath = await takeScreenshot(page, step);
+      const screenshotPath = await takeScreenshot(page, nome, step);
       console.log(`Screenshot: ${screenshotPath}`);
 
       console.log('Perguntando ao Claude...');
-      const raw = await askClaude(screenshotPath, history);
+      const raw = await askClaude(screenshotPath, instrucao, history);
       console.log(`Resposta: ${raw}`);
 
       let action;
@@ -144,24 +151,22 @@ function fail(reason) {
         action = parseAction(raw);
       } catch (e) {
         await context.close();
-        await browser.close();
-        fail(`Erro ao parsear JSON da resposta do Claude: ${e.message}`);
+        return { passed: false, reason: `Erro ao parsear JSON: ${e.message}` };
       }
 
       console.log(`Ação: ${action.action} | Motivo: ${action.reason}`);
 
       if (action.action === 'done') {
-        console.log('\nConcluído! Pesquisa realizada com sucesso.');
-        await takeScreenshot(page, `${step}_final`);
+        console.log(`\nCenário "${nome}" concluído com sucesso.`);
+        await takeScreenshot(page, nome, `${step}_final`);
         concluded = true;
         break;
       }
 
       if (action.action === 'fail') {
-        await takeScreenshot(page, `${step}_fail`);
+        await takeScreenshot(page, nome, `${step}_fail`);
         await context.close();
-        await browser.close();
-        fail(`Claude declarou falha: ${action.reason}`);
+        return { passed: false, reason: `Claude declarou falha: ${action.reason}` };
       }
 
       if (action.action === 'click') {
@@ -176,15 +181,78 @@ function fail(reason) {
     }
 
     await context.close();
-    await browser.close();
 
     if (!concluded) {
-      fail(`Limite de ${MAX_STEPS} steps atingido sem concluir a tarefa.`);
+      return { passed: false, reason: `Limite de ${MAX_STEPS} steps atingido sem concluir.` };
     }
+    return { passed: true, reason: 'Concluído com sucesso.' };
 
   } catch (e) {
     if (context) await context.close().catch(() => {});
+    return { passed: false, reason: `Erro inesperado: ${e.message}` };
+  }
+}
+
+(async () => {
+  let browser;
+
+  try {
+    const scenariosDir = 'cenarios';
+    if (!fs.existsSync(scenariosDir)) {
+      console.error(`Pasta "${scenariosDir}" não encontrada.`);
+      process.exit(1);
+    }
+
+    const scenarioFiles = fs
+      .readdirSync(scenariosDir)
+      .filter(f => f.endsWith('.json'))
+      .sort();
+
+    if (scenarioFiles.length === 0) {
+      console.error(`Nenhum cenário (.json) encontrado em "${scenariosDir}".`);
+      process.exit(1);
+    }
+
+    const scenarios = scenarioFiles.map(f => {
+      const raw = fs.readFileSync(path.join(scenariosDir, f), 'utf8');
+      return JSON.parse(raw);
+    });
+
+    console.log(`Encontrados ${scenarios.length} cenário(s): ${scenarios.map(s => s.nome).join(', ')}`);
+
+    const isCI = process.env.CI === 'true';
+    browser = await chromium.launch({
+      headless: isCI,
+      args: ['--disable-blink-features=AutomationControlled'],
+    });
+
+    const results = [];
+    for (const scenario of scenarios) {
+      const result = await runScenario(browser, scenario);
+      results.push({ nome: scenario.nome, ...result });
+    }
+
+    await browser.close();
+
+    console.log(`\n${'='.repeat(50)}`);
+    console.log('RELATÓRIO FINAL');
+    console.log('='.repeat(50));
+    for (const r of results) {
+      const status = r.passed ? 'PASSOU' : 'FALHOU';
+      console.log(`  [${status}] ${r.nome}: ${r.reason}`);
+    }
+
+    const failed = results.filter(r => !r.passed);
+    if (failed.length > 0) {
+      console.error(`\n${failed.length} cenário(s) falharam.`);
+      process.exit(1);
+    }
+
+    console.log('\nTodos os cenários passaram!');
+
+  } catch (e) {
     if (browser) await browser.close().catch(() => {});
-    fail(`Erro inesperado: ${e.message}`);
+    console.error(`\nErro inesperado: ${e.message}`);
+    process.exit(1);
   }
 })();
