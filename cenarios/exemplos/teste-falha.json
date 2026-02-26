@@ -1,0 +1,4 @@
+{
+  "nome": "teste-falha",
+  "instrucao": "Acesse o google.com e clique no botão chamado 'Menlo'. Se o botão não existir na página após inspecionar cuidadosamente a tela, retorne 'fail'."
+}

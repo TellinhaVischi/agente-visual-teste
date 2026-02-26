@@ -205,7 +205,7 @@ async function runScenario(browser, scenario) {
 
     const scenarioFiles = fs
       .readdirSync(scenariosDir)
-      .filter(f => f.endsWith('.json'))
+      .filter(f => f.endsWith('.json') && fs.statSync(path.join(scenariosDir, f)).isFile())
       .sort();
 
     if (scenarioFiles.length === 0) {

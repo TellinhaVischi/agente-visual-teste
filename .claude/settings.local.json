@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Skill(claude-developer-platform)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/stella.soares_menlop/agente-visual-teste && node agente.js 2>&1)"
     ]
   }
 }
