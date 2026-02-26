@@ -1,18 +1,27 @@
-# Agente Visual com Playwright e Claude
+# Visual Testing Agent
 
-Agente de testes automatizados que usa visão computacional para navegar em interfaces web.
+Agente de testes visuais automatizados que usa visão computacional para navegar e validar qualquer aplicação web, sem depender de seletores ou estrutura interna do DOM.
 
 ## Como funciona
 
 1. Tira um screenshot da tela com Playwright
 2. Envia o screenshot para a API da Anthropic (Claude)
-3. Claude analisa a imagem e retorna a próxima ação em JSON (`click`, `type` ou `done`)
-4. O agente executa a ação no browser e repete até concluir a tarefa
+3. Claude analisa a imagem e retorna a próxima ação em JSON (`click`, `type`, `done` ou `fail`)
+4. O agente executa a ação no browser e repete até concluir o cenário
+5. Ao final, reporta quais cenários passaram e quais falharam
 
-## Scripts
+## Cenários
 
-- **`agente.js`** — agente em loop: abre o Google, pesquisa "Playwright testes automatizados" e encerra quando os resultados aparecem
-- **`screenshot.js`** — tira um screenshot simples do google.com e salva como `screenshot.png`
+Os cenários de teste são arquivos JSON na pasta `cenarios/`. Cada arquivo define um teste independente:
+
+```json
+{
+  "nome": "nome-do-cenario",
+  "instrucao": "Descreva em linguagem natural o que o agente deve fazer e como confirmar sucesso."
+}
+```
+
+O agente lê todos os arquivos `.json` da pasta, executa cada um em sequência e exibe um relatório ao final. Se qualquer cenário falhar, o processo termina com exit code `1`.
 
 ## Instalação
 
@@ -34,6 +43,32 @@ ANTHROPIC_API_KEY=sua-chave-aqui
 ```bash
 node agente.js
 ```
+
+Exemplo de saída:
+
+```
+Encontrados 2 cenário(s): meu-cenario-a, meu-cenario-b
+
+==================================================
+CENÁRIO: meu-cenario-a
+==================================================
+...
+
+==================================================
+RELATÓRIO FINAL
+==================================================
+  [PASSOU] meu-cenario-a: Concluído com sucesso.
+  [PASSOU] meu-cenario-b: Concluído com sucesso.
+
+Todos os cenários passaram!
+```
+
+## Variáveis de ambiente
+
+| Variável | Descrição |
+|---|---|
+| `ANTHROPIC_API_KEY` | Chave de acesso à API da Anthropic |
+| `CI` | Quando `true`, executa o browser em modo headless |
 
 ## Tecnologias
 
