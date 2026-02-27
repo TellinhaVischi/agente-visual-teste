@@ -112,22 +112,40 @@ async function executeAction(page, action) {
 
 async function runScenario(browser, scenario) {
   const { nome, instrucao, url = 'https://www.google.com' } = scenario;
+  const safe = nome.replace(/[^a-z0-9_-]/gi, '_');
+  const videoTarget = `videos/${safe}.webm`;
 
   console.log(`\n${'='.repeat(50)}`);
   console.log(`CENÁRIO: ${nome}`);
   console.log('='.repeat(50));
 
   let context;
+  let page;
+
+  async function closeContext() {
+    if (!context) return;
+    const video = page && page.video();
+    await context.close();
+    if (video) {
+      try {
+        const tmpPath = await video.path();
+        fs.renameSync(tmpPath, videoTarget);
+        console.log(`Vídeo salvo: ${videoTarget}`);
+      } catch (_) {}
+    }
+  }
+
   try {
     context = await browser.newContext({
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 720 },
+      recordVideo: { dir: 'videos/', size: { width: 1280, height: 720 } },
     });
     await context.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });
-    const page = await context.newPage();
+    page = await context.newPage();
 
     console.log(`Abrindo ${url}...`);
     await page.goto(url);
@@ -150,7 +168,7 @@ async function runScenario(browser, scenario) {
       try {
         action = parseAction(raw);
       } catch (e) {
-        await context.close();
+        await closeContext();
         return { passed: false, reason: `Erro ao parsear JSON: ${e.message}` };
       }
 
@@ -165,7 +183,7 @@ async function runScenario(browser, scenario) {
 
       if (action.action === 'fail') {
         await takeScreenshot(page, nome, `${step}_fail`);
-        await context.close();
+        await closeContext();
         return { passed: false, reason: `Claude declarou falha: ${action.reason}` };
       }
 
@@ -180,7 +198,7 @@ async function runScenario(browser, scenario) {
       await executeAction(page, action);
     }
 
-    await context.close();
+    await closeContext();
 
     if (!concluded) {
       return { passed: false, reason: `Limite de ${MAX_STEPS} steps atingido sem concluir.` };
@@ -188,7 +206,7 @@ async function runScenario(browser, scenario) {
     return { passed: true, reason: 'Concluído com sucesso.' };
 
   } catch (e) {
-    if (context) await context.close().catch(() => {});
+    await closeContext().catch(() => {});
     return { passed: false, reason: `Erro inesperado: ${e.message}` };
   }
 }
@@ -202,6 +220,8 @@ async function runScenario(browser, scenario) {
       console.error(`Pasta "${scenariosDir}" não encontrada.`);
       process.exit(1);
     }
+
+    fs.mkdirSync('videos', { recursive: true });
 
     const scenarioFiles = fs
       .readdirSync(scenariosDir)
