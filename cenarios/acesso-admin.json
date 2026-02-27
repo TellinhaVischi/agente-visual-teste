@@ -1,0 +1,5 @@
+{
+  "nome": "acesso-admin",
+  "url": "https://admin.menlopay.dev/",
+  "instrucao": "Confirme que a página carregou com sucesso. Descreva o que está visível na tela no campo 'reason' e retorne 'done'. Se a página estiver em branco ou com erro, retorne 'fail'."
+}

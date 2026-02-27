@@ -1,4 +1,5 @@
 {
   "nome": "busca-playwright",
+  "url": "https://www.google.com",
   "instrucao": "Pesquise 'Playwright testes automatizados' no Google e confirme que os resultados apareceram."
 }

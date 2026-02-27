@@ -1,4 +1,5 @@
 {
   "nome": "busca-anthropic",
+  "url": "https://www.google.com",
   "instrucao": "Pesquise 'Anthropic Claude API' no Google e confirme que os resultados apareceram."
 }

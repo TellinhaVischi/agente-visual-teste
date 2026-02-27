@@ -111,7 +111,7 @@ async function executeAction(page, action) {
 }
 
 async function runScenario(browser, scenario) {
-  const { nome, instrucao } = scenario;
+  const { nome, instrucao, url = 'https://www.google.com' } = scenario;
 
   console.log(`\n${'='.repeat(50)}`);
   console.log(`CENÁRIO: ${nome}`);
@@ -129,8 +129,8 @@ async function runScenario(browser, scenario) {
     });
     const page = await context.newPage();
 
-    console.log('Abrindo google.com...');
-    await page.goto('https://www.google.com');
+    console.log(`Abrindo ${url}...`);
+    await page.goto(url);
     await page.waitForTimeout(1500);
 
     const history = [];
