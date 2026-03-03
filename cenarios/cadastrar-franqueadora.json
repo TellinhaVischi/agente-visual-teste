@@ -1,0 +1,41 @@
+{
+  "nome": "cadastrar-franqueadora",
+  "descricao": "Cadastra uma franqueadora preenchendo os dados manualmente na tela de verificação",
+  "url": "https://admin.menlopay.dev/",
+  "ssePattern": "/upload-status-sse/mAup6u33gMPIplj89gIkPcETYfhKUD/",
+  "instrucao": "Você está no painel de controle do admin. Siga estes passos: (1) Clique no card 'Cadastrar franqueadora'. (2) Na tela de upload que abrir, clique na área de upload usando a ação 'upload' para enviar o arquivo CSV. (3) Na tela 'Verificar dados', verifique que o contador 'Inválido' é 0 e clique em 'Enviar'. (4) Aguarde o processamento usando 'wait' enquanto a tela mostrar loading ou barra de progresso. (5) Se aparecer 'O arquivo foi carregado com sucesso', retorne 'done' IMEDIATAMENTE. (6) Se aparecer 'O upload de dados falhou', retorne 'fail'. (7) Se o painel de controle aparecer e o histórico já contiver uma ação 'upload', retorne 'done' IMEDIATAMENTE sem clicar em nada. Retorne 'fail' se encontrar qualquer erro irrecuperável.",
+  "objetivo": "Clicar em 'Cadastrar franqueadora' no painel, preencher os dados da franqueadora na tela de verificação e enviar com sucesso",
+  "dados": {
+    "id_franqueadora": "",
+    "nome": "Franqueador_teste_{run}",
+    "razao_social": "teste_{run}",
+    "cnpj": "{cnpj}",
+    "rua": "Avenida Sem Denominação Vinte",
+    "numero": "100",
+    "bairro": "Lagoa Azul",
+    "complemento": "teste",
+    "cep": "68909-697",
+    "cidade": "Macapá",
+    "estado": "AP",
+    "status": "Ativa"
+  },
+  "passos": [
+    "Verificar que o painel de controle está carregado com as opções de operação",
+    "Clicar no card 'Cadastrar franqueadora'",
+    "Verificar que a tela de 'Carregar arquivo' foi aberta",
+    "Clicar em 'Ou clique aqui para copiar e colar os dados da tabela'",
+    "Verificar que a tela de 'Verificar dados' está visível com as colunas: id_franqueadora, nome, razao_social, cnpj, rua, numero, bairro, complemento, cep, cidade, estado, status",
+    "Preencher os campos da linha 1 com os dados fornecidos em 'dados'",
+    "Verificar que nenhum campo está destacado em vermelho (sem erros de validação)",
+    "Clicar em 'Enviar'",
+    "Verificar que o cadastro foi concluído com sucesso (mensagem de confirmação ou redirecionamento)"
+  ],
+  "verificacoes": [
+    "Painel de controle carregou corretamente",
+    "Card 'Cadastrar franqueadora' está visível e clicável",
+    "Tela de upload abriu após clicar no card",
+    "Tela de verificação de dados exibe as colunas corretas",
+    "Nenhum campo inválido (vermelho) após preenchimento",
+    "Envio concluído sem mensagem de erro"
+  ]
+}
