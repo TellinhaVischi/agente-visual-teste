@@ -1,0 +1,32 @@
+{
+  "nome": "cadastrar-contatos",
+  "descricao": "Cadastra um contato de loja preenchendo os dados manualmente na tela de verificação",
+  "url": "https://admin.menlopay.dev/",
+  "instrucao": "Você está no painel de controle do admin. Siga estes passos: (1) Clique no card 'Cadastrar contatos de lojas'. (2) Na tela de upload que abrir, clique na área de upload usando a ação 'upload' para enviar o arquivo CSV. (3) Se aparecer a tela 'Mapear colunas', clique em 'Próximo' para continuar. (4) Na tela 'Verificar dados', verifique que o contador 'Inválido' é 0 e clique em 'Enviar'. (5) Aguarde o processamento usando 'wait' enquanto a tela mostrar loading ou barra de progresso. (6) Se aparecer 'O arquivo foi carregado com sucesso', retorne 'done' IMEDIATAMENTE. (7) Se aparecer 'O upload de dados falhou', retorne 'fail'. (8) Se o painel de controle aparecer e o histórico já contiver uma ação 'upload', retorne 'done' IMEDIATAMENTE sem clicar em nada. Retorne 'fail' se encontrar qualquer erro irrecuperável.",
+  "objetivo": "Clicar em 'Cadastrar contatos de lojas' no painel, preencher os dados do contato na tela de verificação e enviar com sucesso",
+  "dados": {
+    "id_loja": "019cb913-6a24-712d-a04c-8a3f17322495",
+    "nome": "{{faker.nome_responsavel}}",
+    "phone": "{{faker.telefone}}",
+    "email": "{{faker.email}}"
+  },
+  "passos": [
+    "Verificar que o painel de controle está carregado com as opções de operação",
+    "Clicar no card 'Cadastrar contatos de lojas'",
+    "Verificar que a tela de 'Carregar arquivo' foi aberta",
+    "Clicar em 'Ou clique aqui para copiar e colar os dados da tabela'",
+    "Verificar que a tela de 'Verificar dados' está visível com as colunas: id_loja, nome, phone, email",
+    "Preencher os campos da linha 1 com os dados fornecidos em 'dados'",
+    "Verificar que nenhum campo está destacado em vermelho (sem erros de validação)",
+    "Clicar em 'Enviar'",
+    "Verificar que o cadastro foi concluído com sucesso (mensagem de confirmação ou redirecionamento)"
+  ],
+  "verificacoes": [
+    "Painel de controle carregou corretamente",
+    "Card 'Cadastrar contatos de lojas' está visível e clicável",
+    "Tela de upload abriu após clicar no card",
+    "Tela de verificação de dados exibe as colunas corretas",
+    "Nenhum campo inválido (vermelho) após preenchimento",
+    "Envio concluído sem mensagem de erro"
+  ]
+}

@@ -1,8 +1,9 @@
 name: Visual Agent
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
 
 jobs:
   run-agent:
