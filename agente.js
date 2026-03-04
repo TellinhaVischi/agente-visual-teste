@@ -7,7 +7,7 @@ const path = require('path');
 const client = new Anthropic();
 const MAX_STEPS = 15;
 
-function generateCNPJ(n) {
+function generateCNPJ(n = Math.floor(Math.random() * 90000000) + 10000000) {
   const base = (10000000 + (n % 90000000)).toString();
   const digits = [...base.split('').map(Number), 0, 0, 0, 1];
   const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
@@ -21,6 +21,46 @@ function generateCNPJ(n) {
   return `${digits[0]}${digits[1]}.${digits[2]}${digits[3]}${digits[4]}.${digits[5]}${digits[6]}${digits[7]}/${digits[8]}${digits[9]}${digits[10]}${digits[11]}-${digits[12]}${digits[13]}`;
 }
 
+function generateTelefone() {
+  const ddd = String(Math.floor(Math.random() * 89) + 11);
+  const p1 = String(Math.floor(Math.random() * 9000) + 1000);
+  const p2 = String(Math.floor(Math.random() * 9000) + 1000);
+  return `(${ddd}) 9${p1}-${p2}`;
+}
+
+function generateFakerData() {
+  const ts = Date.now();
+  const estados = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+  const cepP1 = String(Math.floor(Math.random() * 90000) + 10000);
+  const cepP2 = String(Math.floor(Math.random() * 900) + 100);
+  return {
+    'faker.cnpj': generateCNPJ(),
+    'faker.nome': `Teste ${ts}`,
+    'faker.razao_social': `Teste ${ts} LTDA`,
+    'faker.telefone': generateTelefone(),
+    'faker.email': `teste_${ts}@teste.com.br`,
+    'faker.nome_responsavel': `Responsavel Teste ${ts}`,
+    'faker.rua': `Rua Teste ${Math.floor(Math.random() * 1000) + 1}`,
+    'faker.numero': `${Math.floor(Math.random() * 999) + 1}`,
+    'faker.bairro': `Bairro Teste ${Math.floor(Math.random() * 100) + 1}`,
+    'faker.complemento': `Apto ${Math.floor(Math.random() * 99) + 1}`,
+    'faker.cep': `${cepP1}-${cepP2}`,
+    'faker.cidade': `Cidade Teste ${Math.floor(Math.random() * 50) + 1}`,
+    'faker.estado': estados[Math.floor(Math.random() * estados.length)],
+  };
+}
+
+function applyPlaceholders(dados) {
+  const faker = generateFakerData();
+  const result = {};
+  for (const [key, value] of Object.entries(dados)) {
+    result[key] = typeof value === 'string'
+      ? value.replace(/\{\{([\w.]+)\}\}/g, (match, k) => k in faker ? faker[k] : match)
+      : value;
+  }
+  return result;
+}
+
 function getRunCounter() {
   const counterFile = path.join('generated', '.counter');
   fs.mkdirSync('generated', { recursive: true });
@@ -29,18 +69,6 @@ function getRunCounter() {
   counter++;
   fs.writeFileSync(counterFile, String(counter), 'utf8');
   return counter;
-}
-
-function applyRunPlaceholders(dados, runId) {
-  const suffix = String(runId).padStart(2, '0');
-  const cnpj = generateCNPJ(runId);
-  const result = {};
-  for (const [key, value] of Object.entries(dados)) {
-    result[key] = typeof value === 'string'
-      ? value.replace(/\{run\}/g, suffix).replace(/\{cnpj\}/g, cnpj)
-      : value;
-  }
-  return result;
 }
 
 function buildPrompt(instrucao, history, arquivo) {
@@ -86,7 +114,7 @@ async function askClaude(imagePath, instrucao, history, arquivo) {
     try {
       const response = await client.messages.create({
         model: 'claude-opus-4-6',
-        max_tokens: 256,
+        max_tokens: 1024,
         messages: [
           {
             role: 'user',
@@ -159,15 +187,16 @@ async function executeAction(page, action, arquivo) {
     await page.waitForTimeout(5000);
     return;
   }
-  await page.waitForTimeout(1500);
+  const waitMs = action.action === 'click' ? 3000 : 1500;
+  await page.waitForTimeout(waitMs);
 }
 
-async function runScenario(browser, scenario, runId) {
+async function runScenario(browser, scenario) {
   const { nome, instrucao, url = 'https://www.google.com', dados, ssePattern } = scenario;
   let { arquivo } = scenario;
 
   if (!arquivo && dados) {
-    const resolvedDados = runId ? applyRunPlaceholders(dados, runId) : dados;
+    const resolvedDados = applyPlaceholders(dados);
     const headers = Object.keys(resolvedDados);
     const values = headers.map(k => `"${String(resolvedDados[k]).replace(/"/g, '""')}"`);
     const csvContent = headers.join(',') + '\n' + values.join(',');
@@ -365,7 +394,7 @@ async function runScenario(browser, scenario, runId) {
 
     const results = [];
     for (const scenario of scenarios) {
-      const result = await runScenario(browser, scenario, runId);
+      const result = await runScenario(browser, scenario);
       results.push({ nome: scenario.nome, ...result });
     }
 

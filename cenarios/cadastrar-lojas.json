@@ -1,0 +1,24 @@
+{
+  "nome": "cadastrar-lojas",
+  "descricao": "Cadastra uma loja via upload de planilha CSV no painel admin",
+  "url": "https://admin.menlopay.dev/",
+  "instrucao": "Você está no painel de controle do admin. Siga estes passos: (1) Clique no card 'Cadastrar lojas'. (2) Na tela de upload que abrir, clique na área de upload usando a ação 'upload' para enviar o arquivo CSV. (3) Se aparecer a tela 'Mapear colunas', clique em 'Próximo' para continuar. (4) Na tela 'Verificar dados', verifique que o contador 'Inválido' é 0 e clique em 'Enviar'. (5) Aguarde o processamento usando 'wait' enquanto a tela mostrar loading ou barra de progresso. (6) Se aparecer 'O arquivo foi carregado com sucesso', retorne 'done' IMEDIATAMENTE. (7) Se aparecer 'O upload de dados falhou', retorne 'fail'. (8) Se o painel de controle aparecer e o histórico já contiver uma ação 'upload', retorne 'done' IMEDIATAMENTE sem clicar em nada. Retorne 'fail' se encontrar qualquer erro irrecuperável.",
+  "dados": {
+    "id_loja": "",
+    "id_franqueadora": "019cb07c-6ea0-766b-9294-c0aa9471373c",
+    "nome": "{{faker.nome}}",
+    "razao_social": "{{faker.razao_social}}",
+    "cnpj": "{{faker.cnpj}}",
+    "rua": "{{faker.rua}}",
+    "numero": "{{faker.numero}}",
+    "bairro": "{{faker.bairro}}",
+    "complemento": "{{faker.complemento}}",
+    "cep": "{{faker.cep}}",
+    "cidade": "{{faker.cidade}}",
+    "estado": "{{faker.estado}}",
+    "nome_responsavel_1": "{{faker.nome_responsavel}}",
+    "phone_responsavel_1": "{{faker.telefone}}",
+    "email_responsavel_1": "{{faker.email}}",
+    "status": "Ativa"
+  }
+}

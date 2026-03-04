@@ -7,9 +7,9 @@
   "objetivo": "Clicar em 'Cadastrar franqueadora' no painel, preencher os dados da franqueadora na tela de verificação e enviar com sucesso",
   "dados": {
     "id_franqueadora": "",
-    "nome": "Franqueador_teste_{run}",
-    "razao_social": "teste_{run}",
-    "cnpj": "{cnpj}",
+    "nome": "{{faker.nome}}",
+    "razao_social": "{{faker.razao_social}}",
+    "cnpj": "{{faker.cnpj}}",
     "rua": "Avenida Sem Denominação Vinte",
     "numero": "100",
     "bairro": "Lagoa Azul",
