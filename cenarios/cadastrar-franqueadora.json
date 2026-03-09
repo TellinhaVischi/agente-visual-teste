@@ -30,6 +30,10 @@
     "Clicar em 'Enviar'",
     "Verificar que o cadastro foi concluído com sucesso (mensagem de confirmação ou redirecionamento)"
   ],
+  "dbValidation": {
+    "table": "franchisor",
+    "cnpjField": "document"
+  },
   "verificacoes": [
     "Painel de controle carregou corretamente",
     "Card 'Cadastrar franqueadora' está visível e clicável",

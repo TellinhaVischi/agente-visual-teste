@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { chromium } = require('playwright');
 const Anthropic = require('@anthropic-ai/sdk');
+const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
@@ -191,12 +192,47 @@ async function executeAction(page, action, arquivo) {
   await page.waitForTimeout(waitMs);
 }
 
+async function validateInDatabase(cnpj, dbValidation) {
+  const { table, cnpjField = 'cnpj' } = dbValidation;
+  const cnpjDigits = cnpj.replace(/\D/g, '');
+  console.log(`\nValidando no banco: ${table} WHERE ${cnpjField} = "${cnpjDigits}" (original: "${cnpj}")...`);
+
+  const client = new Client({
+    host: process.env.DEV_DB_HOST,
+    port: parseInt(process.env.DEV_DB_PORT || '5432', 10),
+    database: process.env.DEV_DB_NAME,
+    user: process.env.DEV_DB_USER,
+    password: process.env.DEV_DB_PASSWORD,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  try {
+    await client.connect();
+    const res = await client.query(
+      `SELECT * FROM ${table} WHERE ${cnpjField} = $1 LIMIT 1`,
+      [cnpjDigits]
+    );
+    if (res.rows.length === 0) {
+      return { passed: false, reason: `DB: nenhum registro encontrado com ${cnpjField} = "${cnpj}"` };
+    }
+    const row = res.rows[0];
+    console.log(`DB: registro encontrado — id: ${row.id}`);
+    return { passed: true, reason: `DB: registro confirmado com id=${row.id}` };
+  } catch (e) {
+    return { passed: false, reason: `DB: erro na consulta — ${e.message}` };
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 async function runScenario(browser, scenario) {
   const { nome, instrucao, url = 'https://www.google.com', dados, ssePattern } = scenario;
   let { arquivo } = scenario;
 
+  let resolvedCnpj = null;
   if (!arquivo && dados) {
     const resolvedDados = applyPlaceholders(dados);
+    resolvedCnpj = resolvedDados['cnpj'] || null;
     const headers = Object.keys(resolvedDados);
     const values = headers.map(k => `"${String(resolvedDados[k]).replace(/"/g, '""')}"`);
     const csvContent = headers.join(',') + '\n' + values.join(',');
@@ -346,6 +382,15 @@ async function runScenario(browser, scenario) {
     if (!concluded) {
       return { passed: false, reason: `Limite de ${MAX_STEPS} steps atingido sem concluir.` };
     }
+
+    if (concluded && scenario.dbValidation && resolvedCnpj) {
+      const dbResult = await validateInDatabase(resolvedCnpj, scenario.dbValidation);
+      if (!dbResult.passed) {
+        return { passed: false, reason: dbResult.reason };
+      }
+      console.log(dbResult.reason);
+    }
+
     return { passed: true, reason: 'Concluído com sucesso.' };
 
   } catch (e) {
